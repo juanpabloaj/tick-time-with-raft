@@ -1,4 +1,4 @@
-# Raft tick
+# Tick time with Raft
 
 Every server runs the same time tick, but based on his ID, every server only shows some seconds marks in the log.
 
@@ -19,3 +19,11 @@ Start peers
 Based on
 
 https://github.com/otoolep/hraftd
+
+Using hashicorp/raft
+
+https://github.com/hashicorp/raft
+
+Raft description
+
+https://raft.github.io/
