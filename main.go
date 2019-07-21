@@ -64,6 +64,7 @@ func main() {
 	if err := s.Open(joinAddr == "", nodeID); err != nil {
 		log.Fatalf("%v", err)
 	}
+	s.start()
 
 	service := newService(httpAddr, *s)
 	if err := service.Start(); err != nil {

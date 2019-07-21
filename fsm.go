@@ -6,23 +6,29 @@ import (
 	"log"
 	"net"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/raft"
 )
 
 type Store struct {
-	RaftDir  string
-	RaftBind string
-	raft     *raft.Raft
+	RaftDir     string
+	RaftBind    string
+	raft        *raft.Raft
+	serverID    string
+	numericalID int
+	peersLength int
 }
 
 func (s *Store) Open(enableSingle bool, localID string) error {
 
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
+	s.serverID = localID
 
-	log.Printf("Open [%v] [%v]", config, config.LocalID)
+	log.Printf("Open, local ID [%v]", config.LocalID)
 
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
 	if err != nil {
@@ -76,6 +82,7 @@ func (s *Store) Join(nodeID, addr string) error {
 	}
 
 	for _, srv := range configFuture.Configuration().Servers {
+
 		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
 				log.Printf("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
@@ -94,19 +101,47 @@ func (s *Store) Join(nodeID, addr string) error {
 		return f.Error()
 	}
 
+	s.raft.Apply([]byte("new voter"), raftTimeout)
+
 	log.Printf("node %s at %s joined successfully", nodeID, addr)
 	return nil
 }
 
+func (s *Store) start() {
+	c := time.Tick(1 * time.Second)
+	count := 0
+	go func() {
+		for range c {
+			mod := count % s.peersLength
+			if mod == s.numericalID {
+				log.Printf("ticker ID %d of %d, count %d (%d)", s.numericalID, s.peersLength, count, mod)
+			}
+			count++
+		}
+	}()
+}
+
 func newStore() *Store {
-	return &Store{}
+	return &Store{numericalID: -1, peersLength: -1}
 }
 
 type fsm Store
 
 func (f *fsm) Apply(l *raft.Log) interface{} {
 
-	log.Printf("apply [%v] [%v]", l, l.Data)
+	//log.Printf("apply [%v] [%v]", l, l.Data)
+
+	stats := f.raft.Stats()
+
+	config := stats["latest_configuration"]
+
+	peers := peersList(config)
+	f.peersLength = len(peers)
+
+	ID := f.serverID
+	f.numericalID = getNumericalID(ID, peers)
+
+	log.Printf("apply ID [%s] [%d]", ID, f.numericalID)
 
 	return nil
 }
@@ -147,3 +182,24 @@ func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 func (f *fsmSnapshot) Release() {}
+
+func getNumericalID(ID string, peers []string) int {
+	for i, value := range peers {
+		if value == ID {
+			return i
+		}
+	}
+	return -1
+}
+
+func peersList(rawConfig string) []string {
+	peers := []string{}
+
+	re := regexp.MustCompile(`ID:[0-9A-z]*`)
+
+	for _, peer := range re.FindAllString(rawConfig, -1) {
+		peers = append(peers, strings.Replace(peer, "ID:", "", -1))
+	}
+
+	return peers
+}
