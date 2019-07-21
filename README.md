@@ -12,8 +12,8 @@ Start leader
 
 Start peers
 
-go run . -id node1 -haddr :11001 -raddr :12001 -join :11000 raft1
-go run . -id node2 -haddr :11002 -raddr :12002 -join :11000 raft2
+    go run . -id node1 -haddr :11001 -raddr :12001 -join :11000 raft1
+    go run . -id node2 -haddr :11002 -raddr :12002 -join :11000 raft2
 
 
 Based on
