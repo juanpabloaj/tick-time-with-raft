@@ -114,7 +114,7 @@ func (s *Store) start() {
 		for range c {
 			mod := count % s.peersLength
 			if mod == s.numericalID {
-				log.Printf("ticker ID %d of %d, count %d (%d)", s.numericalID, s.peersLength, count, mod)
+				log.Printf("ticker ID %d of %d, count %d", s.numericalID, s.peersLength, count)
 			}
 			count++
 		}
